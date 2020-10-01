@@ -1,0 +1,387 @@
+1.
+SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       COUNT(DISTINCT SALEDATE) AS sales_num
+FROM TRNSACT
+GROUP BY year_sum, month_sum;
+
+2.
+SELECT DISTINCT SKU,
+   SUM(CASE WHEN EXTRACT(Month FROM saledate) = 6 THEN amt END) AS June_sum,
+   SUM(CASE WHEN EXTRACT(Month FROM saledate) = 7 THEN amt END) AS July_sum,
+   SUM(CASE WHEN EXTRACT(Month FROM saledate) = 8 THEN amt END) AS Aug_sum,
+   (June_sum + July_sum + Aug_sum) AS three_month_revenue
+FROM TRNSACT
+WHERE stype = 'P'
+GROUP BY SKU
+ORDER BY three_month_revenue DESC;
+
+3.
+SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       store,
+       COUNT(DISTINCT SALEDATE) AS sales_num
+FROM TRNSACT
+GROUP BY year_sum, month_sum, store
+ORDER BY sales_num;
+
+4.
+(1)
+SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       store,
+       COUNT(DISTINCT SALEDATE) AS sales_days_num, 
+       SUM(AMT)/sales_days_num AS avg_daily_revenue
+FROM TRNSACT
+WHERE stype = 'P'
+GROUP BY year_sum, month_sum, store
+ORDER BY year_sum DESC, month_sum DESC, store;
+
+(2)
+SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       store,
+       COUNT(DISTINCT SALEDATE) AS sales_days_num, 
+       SUM(AMT)/sales_days_num AS avg_daily_revenue
+FROM TRNSACT
+WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005) 
+GROUP BY year_sum, month_sum, store
+HAVING sales_days_num >= 20
+ORDER BY year_sum DESC, month_sum DESC, store;
+
+(3)
+SELECT filtered_data.month_sum, filtered_data.year_sum, filtered_data.store, filtered_data.sales_days_num, filtered_data.avg_daily_revenue
+FROM
+  (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       store,
+       COUNT(DISTINCT SALEDATE) AS sales_days_num, 
+       SUM(AMT)/sales_days_num AS avg_daily_revenue
+   FROM TRNSACT
+   WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+   GROUP BY month_sum, year_sum, store
+   ) filtered_data
+GROUP BY filtered_data.year_sum, filtered_data.month_sum, filtered_data.store, filtered_data.sales_days_num, filtered_data.avg_daily_revenue
+HAVING filtered_data.sales_days_num >= 20
+ORDER BY filtered_data.year_sum DESC, filtered_data.month_sum DESC, filtered_data.store;
+
+5.
+SELECT (CASE WHEN m.MSA_HIGH >= 50 AND m.MSA_HIGH <= 60 THEN 'low'
+            WHEN m.MSA_HIGH >= 60.1 AND m.MSA_HIGH <= 70 THEN 'medium'
+            WHEN m.MSA_HIGH > 70 THEN 'high'
+       END AS high_school_level), 
+       SUM(sub.total_revenue)/SUM(sub.sales_days_num) AS avg_daily_revenue
+FROM STORE_MSA m
+JOIN (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+           EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+           store,
+           COUNT(DISTINCT SALEDATE) AS sales_days_num,
+           SUM(Amt) AS total_revenue
+      FROM TRNSACT
+      WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+      GROUP BY month_sum, year_sum, store
+      HAVING sales_days_num >= 20
+     ) sub
+ON sub.store = m.store
+GROUP BY high_school_level;
+
+6.
+SELECT state, city, msa_income, SUM(sub.total_revenue)/SUM(sub.sales_days_num) AS avg_daily_revenue
+FROM (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+           EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+           store,
+           COUNT(DISTINCT SALEDATE) AS sales_days_num,
+           SUM(Amt) AS total_revenue
+      FROM TRNSACT
+      WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+      GROUP BY month_sum, year_sum, store
+      HAVING sales_days_num >= 20
+     ) sub 
+JOIN STORE_MSA m
+ON sub.store = m.store
+WHERE msa_income IN (
+     (SELECT MAX(msa_income) FROM store_msa),(SELECT MIN(msa_income) FROM store_msa)
+     )
+GROUP BY state, city, msa_income;
+
+7.
+SELECT DISTINCT (t.SKU) AS item, k.brand AS brand, STDDEV_SAMP(t.sprice) AS dev_price,
+       COUNT(DISTINCT(t.SEQ||t.STORE||t.REGISTER||t.TRANNUM||t.SALEDATE)) AS distinct_transactions 
+FROM TRNSACT t 
+JOIN SKUINFO k
+ON t.SKU = k.SKU
+WHERE t.stype='p'
+GROUP BY item, brand
+HAVING distinct_transactions>100
+ORDER BY distinct_transactions DESC;
+
+8.
+SELECT DISTINCT (t.SKU) AS item, k.brand AS brand, STDDEV_SAMP(t.sprice) AS dev_price,
+       avg(t.orgprice)-avg(t.sprice) AS sale_price_diff,
+       COUNT(distinct(t.trannum)) AS distinct_transactions
+FROM TRNSACT t 
+JOIN SKUINFO k
+ON t.SKU = k.SKU
+WHERE t.stype='p'
+GROUP BY item, brand
+HAVING distinct_transactions>100
+ORDER BY dev_price DESC;
+
+9.
+SELECT CASE filtered_data.month_sum
+            WHEN '1' THEN 'Jan'
+            WHEN '2' THEN 'Feb'
+            WHEN '3' THEN 'Mar'
+            WHEN '4' THEN 'Apr'
+            WHEN '5' THEN 'May'
+            WHEN '6' THEN 'Jun'
+            WHEN '7' THEN 'Jul'
+            WHEN '8' THEN 'Aug'
+            WHEN '9' THEN 'Sep'
+            WHEN '10' THEN 'Oct'
+            WHEN '11' THEN 'Nov'
+            WHEN '12' THEN 'Dec'
+       END AS month_name,
+       SUM(sales_days_num) AS num_days_in_a_month,
+       SUM(tot_revenue)/SUM(sales_days_num) AS avg_monthly_revenue
+FROM
+  (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       COUNT(DISTINCT SALEDATE) AS sales_days_num, 
+       SUM(AMT) AS tot_revenue
+   FROM TRNSACT
+   WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+   GROUP BY month_sum, year_sum
+   HAVING sales_days_num >= 20
+   ) filtered_data
+GROUP BY month_name
+ORDER BY avg_monthly_revenue DESC;
+
+Q4.
+SELECT sub.SKU, 
+       SUM(CASE WHEN sub.month_num = 11 THEN sub.sum_amt ELSE 0 END) AS nov_amt,
+       SUM(CASE WHEN sub.month_num = 12 THEN sub.sum_amt ELSE 0 END) AS dec_amt,
+       (dec_amt - nov_amt) AS increase
+FROM 
+    (SELECT SKU, EXTRACT(MONTH FROM SALEDATE) AS month_num, SUM(AMT) AS sum_amt
+     FROM TRNSACT
+     GROUP BY SKU, month_num
+     WHERE month_num = 11 OR month_num = 12) sub
+GROUP BY sub.SKU
+ORDER BY increase DESC;
+
+Q5.
+SELECT u.vendor, COUNT(a.SKU) as num_SKU
+FROM
+    (SELECT DISTINCT t.SKU
+    FROM TRNSACT t LEFT JOIN SKSTINFO k
+    ON t.SKU = k.SKU
+    WHERE k.SKU IS NULL) a
+JOIN SKUINFO u
+ON a.SKU = u.SKU
+GROUP BY 1
+ORDER BY 2 DESC;
+
+Q6.
+SELECT u.brand, sub.sku, sub.std, sub.tran
+FROM (SELECT sku,  STDDEV_POP(sprice) AS std, COUNT(sprice) AS tran
+	FROM TRNSACT
+	WHERE stype='P'
+	GROUP BY sku 
+	HAVING tran > 100) sub JOIN SKUINFO AS u
+ON sub.sku = u.sku
+ORDER BY sub.std DESC
+
+Q7.
+SELECT sub.store, sub.city, sub.state, 
+       SUM(CASE WHEN sub.month_num = 11 THEN sub.sum_amt ELSE 0 END)/COUNT(sub.sales_days_num) AS nov_amt,
+       SUM(CASE WHEN sub.month_num = 12 THEN sub.sum_amt ELSE 0 END)/COUNT(sub.sales_days_num) AS dec_amt,
+       (dec_amt - nov_amt) AS increase
+FROM (SELECT t.store, r.city, r.state, EXTRACT(MONTH FROM SALEDATE) AS month_num, 
+             COUNT(DISTINCT SALEDATE) AS sales_days_num, SUM(t.amt) AS sum_amt
+      FROM TRNSACT t JOIN STRINFO r
+      ON t.store = r.store
+      WHERE month_num = 11 OR month_num = 12
+      GROUP BY 1,2,3,4) sub
+GROUP BY 1,2,3
+ORDER BY increase DESC;
+
+Q8.
+SELECT state, city, msa_income, SUM(sub.total_revenue)/SUM(sub.sales_days_num) AS avg_daily_revenue
+FROM (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+           EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+           store,
+           COUNT(DISTINCT SALEDATE) AS sales_days_num,
+           SUM(Amt) AS total_revenue
+      FROM TRNSACT
+      WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+      GROUP BY month_sum, year_sum, store
+      HAVING sales_days_num >= 20
+     ) sub 
+JOIN STORE_MSA m
+ON sub.store = m.store
+WHERE msa_income IN (
+     (SELECT MAX(msa_income) FROM store_msa),(SELECT MIN(msa_income) FROM store_msa)
+     )
+GROUP BY state, city, msa_income;
+
+Q9.
+SELECT (CASE WHEN m.MSA_INCOME >= 1 AND m.MSA_INCOME <= 20000 THEN 'low'
+            WHEN m.MSA_INCOME >= 20001 AND m.MSA_INCOME <= 30000 THEN 'med-low'
+            WHEN m.MSA_INCOME >= 30001 AND m.MSA_INCOME <= 40000 THEN 'med-high'
+            WHEN m.MSA_INCOME >= 40001 AND m.MSA_INCOME <= 60000 THEN 'high'
+       END AS income_level), 
+       SUM(sub.total_revenue)/SUM(sub.sales_days_num) AS avg_daily_revenue
+FROM STORE_MSA m
+JOIN (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+           EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+           store,
+           COUNT(DISTINCT SALEDATE) AS sales_days_num,
+           SUM(Amt) AS total_revenue
+      FROM TRNSACT
+      WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+      GROUP BY month_sum, year_sum, store
+      HAVING sales_days_num >= 20
+     ) sub
+ON sub.store = m.store
+GROUP BY income_level;
+
+Q10.
+SELECT (CASE WHEN m.MSA_pop >= 1 AND m.MSA_pop <= 100000 THEN 'very small'
+            WHEN m.MSA_pop >= 100001 AND m.MSA_pop <= 200000 THEN 'small'
+            WHEN m.MSA_pop >= 200001 AND m.MSA_pop <= 500000 THEN 'med-small'
+            WHEN m.MSA_pop >= 500001 AND m.MSA_pop <= 1000000 THEN 'med-large'
+            WHEN m.MSA_pop >= 1000001 AND m.MSA_pop <= 5000000 THEN 'large'
+            WHEN m.MSA_pop > 5000000 THEN 'very large'
+       END AS population_level),
+       SUM(sub.total_revenue)/SUM(sub.sales_days_num) AS avg_daily_revenue
+FROM STORE_MSA m
+JOIN (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+           EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+           store,
+           COUNT(DISTINCT SALEDATE) AS sales_days_num,
+           SUM(Amt) AS total_revenue
+      FROM TRNSACT
+      WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+      GROUP BY month_sum, year_sum, store
+      HAVING sales_days_num >= 20
+     ) sub
+ON sub.store = m.store
+GROUP BY 1
+ORDER BY population_level DESC;
+
+Q11.
+SELECT s.store, s.city, s.state, d.deptdesc, 
+       sum(case when extract(month from saledate)=11 then amt end) as Nov_sum,
+       COUNT(DISTINCT (case WHEN EXTRACT(MONTH from saledate) ='11' then saledate END)) as Nov_days, 
+       sum(case when extract(month from saledate)=12 then amt end) as Dec_sum,
+       COUNT(DISTINCT (case WHEN EXTRACT(MONTH from saledate) ='12' then saledate END)) as Dec_days, 
+       ((Dec_sum/Dec_days)-(Nov_sum/Nov_days))/(Nov_sum/Nov_days)*100 AS increase
+FROM trnsact t JOIN strinfo s
+ON t.store=s.store JOIN skuinfo u
+ON t.sku=u.sku JOIN deptinfo d
+ON u.dept=d.dept
+WHERE t.stype='P' and 
+      t.store||EXTRACT(YEAR from t.saledate)||EXTRACT(MONTH from t.saledate) IN (SELECT store||EXTRACT(YEAR from saledate)||EXTRACT(MONTH from saledate)
+FROM trnsact
+GROUP BY store, EXTRACT(YEAR from saledate), EXTRACT(MONTH from saledate)
+HAVING COUNT(DISTINCT saledate)>= 20)
+GROUP BY s.store, s.city, s.state, d.deptdesc 
+HAVING Nov_sum > 1000 AND Dec_sum > 1000
+ORDER BY increase DESC;
+
+Q12.
+SELECT s.store, s.city, s.state, d.deptdesc, 
+       sum(case when extract(month from saledate)=8 then amt end) as Aug_sum,
+       COUNT(DISTINCT (case WHEN EXTRACT(MONTH from saledate) ='8' then saledate END)) as Aug_days, 
+       sum(case when extract(month from saledate)=9 then amt end) as Sep_sum,
+       COUNT(DISTINCT (case WHEN EXTRACT(MONTH from saledate) ='9' then saledate END)) as Sep_days, 
+       ((Aug_sum/Aug_days)-(Sep_sum/Sep_days)) AS decrease
+FROM trnsact t JOIN strinfo s
+ON t.store=s.store JOIN skuinfo u
+ON t.sku=u.sku JOIN deptinfo d
+ON u.dept=d.dept
+WHERE t.stype='P' and 
+      t.store||EXTRACT(YEAR from t.saledate)||EXTRACT(MONTH from t.saledate) IN (SELECT store||EXTRACT(YEAR from saledate)||EXTRACT(MONTH from saledate)
+FROM trnsact
+GROUP BY store, EXTRACT(YEAR from saledate), EXTRACT(MONTH from saledate)
+HAVING COUNT(DISTINCT saledate)>= 20)
+GROUP BY s.store, s.city, s.state, d.deptdesc 
+ORDER BY decrease DESC;
+
+Q13.
+SELECT s.store, s.city, s.state, d.deptdesc, 
+       CASE WHEN EXTRACT(year from saledate) = 2005 AND EXTRACT(month from saledate) = 8 THEN 'exclude' END AS exclude_flag,
+       SUM (case WHEN EXTRACT(MONTH from saledate) ='8' then t.quantity END) as Aug_solds, 
+       SUM (case WHEN EXTRACT(MONTH from saledate) ='9' then t.quantity END) as Sep_solds, 
+       (Aug_solds-Sep_solds) AS decrease
+FROM trnsact t JOIN strinfo s
+ON t.store=s.store JOIN skuinfo u
+ON t.sku=u.sku JOIN deptinfo d
+ON u.dept=d.dept
+WHERE t.stype='P' AND 
+      t.store||EXTRACT(YEAR from t.saledate)||EXTRACT(MONTH from t.saledate) IN (SELECT store||EXTRACT(YEAR from saledate)||EXTRACT(MONTH from saledate)
+FROM trnsact
+GROUP BY store, EXTRACT(YEAR from saledate), EXTRACT(MONTH from saledate)
+HAVING COUNT(DISTINCT saledate)>= 20)
+GROUP BY s.store, s.city, s.state, d.deptdesc, exclude_flag
+ORDER BY decrease DESC;
+
+Q14.
+SELECT CASE sub.month_sum
+            WHEN '1' THEN 'Jan'
+            WHEN '2' THEN 'Feb'
+            WHEN '3' THEN 'Mar'
+            WHEN '4' THEN 'Apr'
+            WHEN '5' THEN 'May'
+            WHEN '6' THEN 'Jun'
+            WHEN '7' THEN 'Jul'
+            WHEN '8' THEN 'Aug'
+            WHEN '9' THEN 'Sep'
+            WHEN '10' THEN 'Oct'
+            WHEN '11' THEN 'Nov'
+            WHEN '12' THEN 'Dec'
+       END AS month_name, COUNT(store),
+       SUM(sub.total_revenue)/SUM(sub.sales_days_num) AS avg_daily_revenue
+FROM
+  (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       store,
+       COUNT(DISTINCT SALEDATE) AS sales_days_num,
+       SUM(Amt) AS total_revenue
+   FROM TRNSACT
+   WHERE stype = 'P' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+   GROUP BY month_sum, year_sum, store
+   HAVING sales_days_num >= 20
+   ) sub
+GROUP BY month_name
+ORDER BY avg_daily_revenue; 
+
+Q15.
+SELECT CASE filtered_data.month_sum
+            WHEN '1' THEN 'Jan'
+            WHEN '2' THEN 'Feb'
+            WHEN '3' THEN 'Mar'
+            WHEN '4' THEN 'Apr'
+            WHEN '5' THEN 'May'
+            WHEN '6' THEN 'Jun'
+            WHEN '7' THEN 'Jul'
+            WHEN '8' THEN 'Aug'
+            WHEN '9' THEN 'Sep'
+            WHEN '10' THEN 'Oct'
+            WHEN '11' THEN 'Nov'
+            WHEN '12' THEN 'Dec'
+       END AS month_name, store,
+       SUM(returned_sum) as returned
+FROM
+  (SELECT EXTRACT(MONTH FROM SALEDATE) AS month_sum,
+       EXTRACT(YEAR FROM SALEDATE) AS year_sum,
+       SUM(Quantity) AS returned_sum,
+       COUNT(DISTINCT SALEDATE) AS sales_days_num, store
+   FROM TRNSACT
+   WHERE stype = 'R' AND (EXTRACT(MONTH FROM SALEDATE) <> 8 OR EXTRACT(YEAR FROM SALEDATE) <> 2005)
+   GROUP BY month_sum, year_sum, store
+   HAVING sales_days_num >= 20
+   ) filtered_data
+GROUP BY month_name, store
+ORDER BY returned DESC; 
